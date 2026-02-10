@@ -8,6 +8,7 @@ app = Flask(__name__)
 with open("xgb_noshow_model.pkl", "rb") as f:
     model = pickle.load(f)
 
+
 def build_features(data):
     features = {}
 
@@ -25,14 +26,13 @@ def build_features(data):
 
     # derived
     features["SMS_received"] = 1 if data["Reminder_channel"] == "SMS" else 0
-
     features["Visit_Number"] = data["Visit_Number"]
 
     features["Reliability_Score"] = (
-    data["Past_NoShow_Count"] / (data["Visit_Number"] + 1))
+        data["Past_NoShow_Count"] / (data["Visit_Number"] + 1)
+    )
 
-
-    # handicap age 
+    # handicap + age buckets
     is_elderly = 1 if data["Age"] >= 65 else 0
     is_disabled = 1 if data["Handicap"] == 1 else 0
 
@@ -40,29 +40,24 @@ def build_features(data):
     features["Handicap/Old_Only Disabled"] = 1 if (is_elderly == 0 and is_disabled == 1) else 0
     features["Handicap/Old_Only Elderly"] = 1 if (is_elderly == 1 and is_disabled == 0) else 0
 
-
     # appointment day one-hot
-    days = [
-        "Monday", "Tuesday", "Wednesday",
-        "Thursday", "Saturday"
-    ]
-
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Saturday"]
     for day in days:
-        col = f"Appointment_Day_{day}"
-        features[col] = 1 if data["Appointment_Day"] == day else 0
+        features[f"Appointment_Day_{day}"] = 1 if data["Appointment_Day"] == day else 0
 
     return features
-
-if data["Past_NoShow_Count"] >= data["Visit_Number"]:
-    return jsonify({"error": "Invalid visit history"}), 400
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    raw_data = request.json
+    data = request.json
 
-    feature_dict = build_features(raw_data)
+    if data["Past_NoShow_Count"] >= data["Visit_Number"]:
+        return jsonify({
+            "error": "Invalid visit history: Past_NoShow_Count >= Visit_Number"
+        }), 400
 
+    feature_dict = build_features(data)
     df = pd.DataFrame([feature_dict])
 
     df = df[model.feature_names_in_]
@@ -72,5 +67,7 @@ def predict():
     return jsonify({
         "noshow_risk": round(float(risk), 2)
     })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
