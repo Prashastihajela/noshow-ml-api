@@ -28,7 +28,8 @@ def build_features(data):
 
     features["Visit_Number"] = data["Visit_Number"]
 
-    features["Reliability_Score"] = max( 0, 1 - (data["Past_NoShow_Count"]/ max(data["Visit_Number"], 1)))
+    features["Reliability_Score"] = (
+    data["Past_NoShow_Count"] / (data["Visit_Number"] + 1))
 
 
     # handicap age 
@@ -52,6 +53,10 @@ def build_features(data):
 
     return features
 
+if data["Past_NoShow_Count"] >= data["Visit_Number"]:
+    return jsonify({"error": "Invalid visit history"}), 400
+
+
 @app.route("/predict", methods=["POST"])
 def predict():
     raw_data = request.json
@@ -62,7 +67,7 @@ def predict():
 
     df = df[model.feature_names_in_]
 
-    risk = model.predict_proba(df, validate_features=False)[0][1]
+    risk = model.predict_proba(df)[0][1]
 
     return jsonify({
         "noshow_risk": round(float(risk), 2)
