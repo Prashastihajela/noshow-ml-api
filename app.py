@@ -26,17 +26,19 @@ def build_features(data):
     # derived
     features["SMS_received"] = 1 if data["Reminder_channel"] == "SMS" else 0
 
-    features["Visit_Number"] = data["Past_NoShow_Count"] + 1
+    features["Visit_Number"] = data["Visit_Number"]
 
-    features["Reliability_Score"] = max(
-        0,
-        1 - (data["Past_NoShow_Count"] * 0.2)
-    )
+    features["Reliability_Score"] = max( 0, 1 - (data["Past_NoShow_Count"]/ max(data["Visit_Number"], 1)))
 
-    # handicap age logic (simplified demo)
-    features["Handicap/Old_Neither"] = 1
-    features["Handicap/Old_Only Disabled"] = 0
-    features["Handicap/Old_Only Elderly"] = 0
+
+    # handicap age 
+    is_elderly = 1 if data["Age"] >= 65 else 0
+    is_disabled = 1 if data["Handicap"] == 1 else 0
+
+    features["Handicap/Old_Neither"] = 1 if (is_elderly == 0 and is_disabled == 0) else 0
+    features["Handicap/Old_Only Disabled"] = 1 if (is_elderly == 0 and is_disabled == 1) else 0
+    features["Handicap/Old_Only Elderly"] = 1 if (is_elderly == 1 and is_disabled == 0) else 0
+
 
     # appointment day one-hot
     days = [
